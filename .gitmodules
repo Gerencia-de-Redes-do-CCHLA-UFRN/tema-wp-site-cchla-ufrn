@@ -1,0 +1,4 @@
+[submodule "tema-original"]
+	path = tema-original
+	url = https://github.com/awe-zn/CCHLA-UFRN.git
+	branch = wp-thema
