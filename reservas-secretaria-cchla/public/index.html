@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Agendamentos - CCHLA/UFRN</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --primary-navy: #003B7C;
+            --primary-hover: #002D5F;
+            --accent-gold: #dca30c;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 2rem; }
+        .container { max-width: 1300px; margin: 0 auto; }
+        
+        .header {
+            display: flex; align-items: center; margin-bottom: 2rem; padding: 1rem 1.5rem;
+            background: var(--card-bg); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); gap: 1.5rem;
+        }
+        .header-logo { height: 60px; width: auto; }
+        .header h1 { font-size: 1.7rem; color: var(--primary-navy); font-weight: 700; }
+
+        .controls {
+            background: var(--card-bg); padding: 1.5rem; border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem;
+        }
+
+        .filter-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;
+        }
+        .input-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        label { font-weight: 600; font-size: 0.8rem; color: var(--primary-navy); text-transform: uppercase; letter-spacing: 0.7px; }
+        input[type="text"], input[type="date"], select {
+            padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 0.95rem; outline: none; transition: 0.2s; background-color: #fff; width: 100%; height: 45px;
+        }
+        input:focus, select:focus { border-color: var(--primary-navy); box-shadow: 0 0 0 3px rgba(220, 163, 12, 0.2); }
+
+        .clear-btn {
+            height: 45px; background-color: #ef4444; color: white; border: none; border-radius: 6px;
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .clear-btn:hover { background-color: #dc2626; }
+
+        .table-container { background: var(--card-bg); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 1rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        th { background-color: var(--primary-navy); color: #ffffff; font-weight: 600; font-size: 0.9rem; white-space: nowrap; }
+        td { font-size: 0.9rem; line-height: 1.5; }
+        .col-desc { min-width: 320px; white-space: pre-wrap; word-break: break-word; }
+        tr:hover { background-color: #f9fafb; }
+        .status-empty { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1.1rem; }
+        
+        .badge { background: #fef3c7; color: #92400e; padding: 0.3rem 0.7rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .summary { margin-bottom: 1rem; color: var(--text-muted); font-size: 0.95rem; font-weight: 500; }
+        .error-msg { color: #dc2626; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <img src="cchlalogo.png" alt="Logo CCHLA" class="header-logo">
+            <h1>Sistema de Agendamentos</h1>
+        </div>
+
+        <div class="controls">
+            <div class="filter-grid">
+                <div class="input-group">
+                    <label for="mesSelect">Filtrar por Mês</label>
+                    <select id="mesSelect">
+                        <option value="Todos">Todos os Meses</option>
+                        <option value="Maio">Maio</option>
+                        <option value="Junho">Junho</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="localSelect">Filtrar por Local</label>
+                    <select id="localSelect">
+                        <option value="Todos">Todos os Locais</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="dateInput">Data de Início</label>
+                    <input type="date" id="dateInput">
+                </div>
+
+                <div class="input-group" style="grid-column: span 1;">
+                    <label for="searchInput">Buscar Agendamento</label>
+                    <input type="text" id="searchInput" placeholder="Título, professor, contato...">
+                </div>
+
+                <button class="clear-btn" id="clearFiltersBtn">Limpar Filtros</button>
+            </div>
+        </div>
+        
+        <div class="summary" id="resultsSummary">Conectando à planilha Excel automaticamente...</div>
+
+        <div class="table-container">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Mês</th>
+                        <th>Título</th>
+                        <th>Início (GMT-3)</th>
+                        <th>Fim (GMT-3)</th>
+                        <th>Local</th>
+                        <th>Contato</th>
+                        <th>Descrição Completa</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="7" class="status-empty">Carregando dados...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let globalData = [];
+
+        const searchInput = document.getElementById('searchInput');
+        const mesSelect = document.getElementById('mesSelect');
+        const localSelect = document.getElementById('localSelect');
+        const dateInput = document.getElementById('dateInput');
+        const tableBody = document.getElementById('tableBody');
+        const resultsSummary = document.getElementById('resultsSummary');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+
+        // NOME EXATO DO ARQUIVO EXCEL NA MESMA PASTA:
+        const EXCEL_FILENAME = 'Agendamentos-maio-junho-2026.xlsx';
+
+        // Função executada automaticamente ao abrir a página
+        window.onload = async function() {
+            try {
+                // Tenta puxar o arquivo automaticamente
+                const response = await fetch(EXCEL_FILENAME);
+                
+                if (!response.ok) {
+                    throw new Error("Planilha não encontrada ou erro de permissão do navegador.");
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                
+                const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                jsonData.forEach(row => {
+                    const startComp = parseAndConvertToLocal(row.Data_Inicio);
+                    const endComp = parseAndConvertToLocal(row.Data_Fim);
+
+                    row._localStartDateStr = startComp ? startComp.yyyymmdd : "";
+                    row._localStartDisplay = startComp ? startComp.display : "-";
+                    row._localEndDisplay = endComp ? endComp.display : "-";
+                    row._mesIdentificado = startComp ? startComp.monthName : "Outro";
+                });
+
+                globalData = jsonData;
+                
+                updateLocalDropdown();
+                applyFilters();
+
+            } catch (err) {
+                console.error(err);
+                resultsSummary.innerHTML = `<span class="error-msg">Erro: Não foi possível ler '${EXCEL_FILENAME}' automaticamente. Lembre-se que para conexão direta, a página precisa estar rodando em um servidor local.</span>`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="status-empty">Falha na conexão com a planilha.</td></tr>`;
+            }
+        };
+
+        function parseAndConvertToLocal(dateInput) {
+            if (!dateInput) return null;
+            let dateObj;
+
+            if (typeof dateInput === "string") {
+                let isoString = dateInput.trim();
+                if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(isoString)) {
+                    isoString = isoString.replace(" ", "T") + "Z";
+                }
+                dateObj = new Date(isoString);
+            } else if (dateInput instanceof Date) {
+                dateObj = new Date(Date.UTC(
+                    dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(),
+                    dateInput.getHours(), dateInput.getMinutes(), dateInput.getSeconds()
+                ));
+            } else { return null; }
+
+            if (isNaN(dateObj.getTime())) return null;
+
+            const formatter = new Intl.DateTimeFormat('pt-BR', {
+                timeZone: 'America/Fortaleza',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            
+            const parts = formatter.formatToParts(dateObj);
+            const comp = {};
+            parts.forEach(p => comp[p.type] = p.value);
+
+            const yyyymmdd = `${comp.year}-${comp.month}-${comp.day}`;
+            const display = `${comp.day}/${comp.month}/${comp.year}<br>às <b>${comp.hour}:${comp.minute}</b>`;
+            const monthName = comp.month === "05" ? "Maio" : (comp.month === "06" ? "Junho" : "Outro");
+
+            return { yyyymmdd, display, monthName };
+        }
+
+        function updateLocalDropdown() {
+            const previousSelection = localSelect.value;
+            localSelect.innerHTML = '<option value="Todos">Todos os Locais</option>';
+            const categories = [...new Set(globalData.map(row => row.Categoria).filter(Boolean))].sort();
+            
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                localSelect.appendChild(opt);
+            });
+            
+            if (categories.includes(previousSelection)) {
+                localSelect.value = previousSelection;
+            } else {
+                localSelect.value = "Todos";
+            }
+        }
+
+        function applyFilters() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const mesFilter = mesSelect.value;
+            const localFilter = localSelect.value;
+            const dateFilter = dateInput.value;
+
+            const filteredData = globalData.filter(row => {
+                if (mesFilter !== "Todos" && row._mesIdentificado !== mesFilter) return false;
+                if (localFilter !== "Todos" && row.Categoria !== localFilter) return false;
+                if (dateFilter && row._localStartDateStr !== dateFilter) return false;
+                
+                if (searchTerm) {
+                    const matchText = (
+                        (row.Titulo && row.Titulo.toLowerCase().includes(searchTerm)) ||
+                        (row.Categoria && row.Categoria.toLowerCase().includes(searchTerm)) ||
+                        (row.Contato && row.Contato.toLowerCase().includes(searchTerm)) ||
+                        (row.Descricao_Completa && row.Descricao_Completa.toLowerCase().includes(searchTerm))
+                    );
+                    if (!matchText) return false;
+                }
+                return true;
+            });
+            renderTable(filteredData);
+        }
+
+        searchInput.addEventListener('input', applyFilters);
+        mesSelect.addEventListener('change', applyFilters);
+        localSelect.addEventListener('change', applyFilters);
+        dateInput.addEventListener('change', applyFilters);
+
+        clearFiltersBtn.addEventListener('click', function() {
+            searchInput.value = "";
+            mesSelect.value = "Todos";
+            localSelect.value = "Todos";
+            dateInput.value = "";
+            applyFilters();
+        });
+
+        function renderTable(data) {
+            tableBody.innerHTML = "";
+            if (globalData.length === 0) return;
+
+            resultsSummary.innerHTML = `Exibindo <strong>${data.length}</strong> agendamentos de um total de <strong>${globalData.length}</strong> registros carregados.`;
+
+            if (data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="status-empty">Nenhum agendamento corresponde aos filtros selecionados.</td></tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                if (!row.Titulo && !row.Data_Inicio) return;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${row._mesIdentificado}</strong></td>
+                    <td><strong>${row.Titulo || "-"}</strong></td>
+                    <td>${row._localStartDisplay}</td>
+                    <td>${row._localEndDisplay}</td>
+                    <td><span class="badge">${row.Categoria || "Não Informado"}</span></td>
+                    <td>${row.Contato || "-"}</td>
+                    <td class="col-desc">${row.Descricao_Completa || "-"}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
