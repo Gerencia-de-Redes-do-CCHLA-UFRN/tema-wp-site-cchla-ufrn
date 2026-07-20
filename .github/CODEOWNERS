@@ -1,0 +1,11 @@
+# Reviewers automaticos por caminho. Todo PR que toca esses arquivos ja nasce
+# com os donos marcados pra revisao.
+
+# Donos padrao do repositorio
+*                    @Pedrolucas888 @tobiasrocha @LeonardoPCavalcanti
+
+# Infra / esteira CI-CD: revisao do responsavel
+/.github/            @Pedrolucas888
+
+# Tema (codigo de trabalho)
+/tema-cchla/         @Pedrolucas888 @tobiasrocha @LeonardoPCavalcanti

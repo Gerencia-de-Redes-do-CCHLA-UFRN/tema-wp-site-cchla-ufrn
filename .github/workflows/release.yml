@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Sobrescrever versao (opcional, ex: 1.2.0)'
+        required: false
+        type: string
+      description:
+        description: 'Descricao do release'
+        required: false
+        type: string
+        default: ''
+
+# Fonte da versao: cabecalho "Version:" do style.css do tema (nao ha package.json).
+env:
+  THEME_DIR: tema-cchla
+  THEME_SLUG: cchla-ufrn
+
+jobs:
+  release:
+    name: Criar Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0          # historico completo pra achar a tag anterior
+
+      - name: Resolver versao (style.css)
+        id: version
+        env:
+          OVERRIDE: ${{ inputs.version }}
+        run: |
+          if [ -n "$OVERRIDE" ]; then
+            VERSION="$OVERRIDE"
+          else
+            VERSION=$(grep -iE '^[[:space:]]*Version:' "$THEME_DIR/style.css" | head -n1 | sed -E 's/.*[Vv]ersion:[[:space:]]*//' | tr -d '[:space:]')
+          fi
+          if [ -z "$VERSION" ]; then echo "FAIL: versao nao encontrada em $THEME_DIR/style.css"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Versao resolvida: $VERSION"
+
+      - name: Verificar se a tag ja existe
+        id: check
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG ja existe — pulando (idempotente)."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Empacotar tema (zip instalavel no WordPress)
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          # Empacota como wp-content/themes/<slug>/ pra instalar com o nome certo.
+          mkdir -p "build/$THEME_SLUG"
+          rsync -a --exclude='.git' "$THEME_DIR"/ "build/$THEME_SLUG"/
+          (cd build && zip -rq "../$THEME_SLUG.zip" "$THEME_SLUG")
+          echo "Zip: $THEME_SLUG.zip ($(du -h "$THEME_SLUG.zip" | cut -f1))"
+
+      - name: Gerar changelog
+        if: steps.check.outputs.exists == 'false'
+        id: changelog
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          PREV=$(git tag --sort=-v:refname | grep -v "^$TAG$" | head -n1 || echo "")
+          if [ -z "$PREV" ]; then
+            RANGE=""; HEADER="Commits iniciais"
+          else
+            RANGE="$PREV..HEAD"; HEADER="Mudancas desde $PREV"
+          fi
+          {
+            echo "changelog<<EOF_CHANGELOG"
+            echo "## $HEADER"
+            echo ""
+            git log --pretty=format:"- %s (%h)" $RANGE | grep -vE "^- (Merge|chore\(deps)" || echo "- (sem commits relevantes)"
+            echo ""
+            echo "EOF_CHANGELOG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Criar release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DESC: ${{ inputs.description }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            [ -n "$DESC" ] && printf '%s\n\n' "$DESC"
+            printf '%s\n' "$CHANGELOG"
+            printf '\n---\n*Release automatizado via GitHub Actions*\n'
+          } > /tmp/notes.md
+          gh release create "$TAG" \
+            --target main \
+            --title "CCHLA UFRN v$VERSION" \
+            --notes-file /tmp/notes.md \
+            "$THEME_SLUG.zip"

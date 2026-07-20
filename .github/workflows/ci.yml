@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, Pedro, Tobias, Leo]
+
+# Caminho do tema editavel dentro do repo (o submodulo tema-original nao entra no CI).
+env:
+  THEME_DIR: tema-cchla
+
+jobs:
+  php-lint:
+    name: php-lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.2']   # 7.4 = "Requires PHP" do style.css; 8.2 = producao atual
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: php -l em todos os arquivos PHP
+        run: |
+          err=0
+          while IFS= read -r -d '' f; do
+            php -l "$f" >/dev/null || { echo "SYNTAX ERROR: $f"; err=1; }
+          done < <(find "$THEME_DIR" -name '*.php' -print0)
+          if [ "$err" -ne 0 ]; then echo "FAIL: erro de sintaxe PHP"; exit 1; fi
+          echo "OK: sintaxe valida em $(find "$THEME_DIR" -name '*.php' | wc -l) arquivos PHP"
+
+  phpcs:
+    name: phpcs
+    runs-on: ubuntu-latest
+    continue-on-error: true   # NAO bloqueia PR: informativo (tema legado tem muitos avisos)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Instalar PHP_CodeSniffer + WordPress Coding Standards
+        run: |
+          # Composer 2.2+ bloqueia plugins de terceiros por padrao; libera o installer do PHPCS.
+          composer global config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer global require --no-interaction \
+            squizlabs/php_codesniffer \
+            wp-coding-standards/wpcs \
+            dealerdirect/phpcodesniffer-composer-installer:^1.0
+          echo "$HOME/.composer/vendor/bin" >> "$GITHUB_PATH"
+          "$HOME/.composer/vendor/bin/phpcs" -i
+      - name: Rodar phpcs (padrao WordPress) — informativo
+        run: |
+          phpcs --standard=WordPress --extensions=php --report=summary "$THEME_DIR" || true
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Padroes de codigo perigoso (assinaturas de malware em tema)
+        run: |
+          DANGEROUS='\b(eval|base64_decode|gzinflate|gzuncompress|str_rot13|system|exec|shell_exec|passthru|proc_open|create_function)[[:space:]]*\('
+          if grep -rniE "$DANGEROUS" "$THEME_DIR" --include='*.php'; then
+            echo "FAIL: padrao de codigo perigoso encontrado (possivel backdoor/malware)."
+            exit 1
+          fi
+          echo "OK: nenhum padrao perigoso em PHP."
+      - name: Segredos hardcoded
+        run: |
+          Q=$'["\x27]'   # bracket com aspas duplas ou simples (ANSI-C quoting resolve o \x27)
+          SECRETS="(api[_-]?key|secret|token|passwd|password|credential|authorization)[[:space:]]*(=>|=|:)[[:space:]]*${Q}[A-Za-z0-9+/_-]{16,}"
+          if grep -rniE "$SECRETS" "$THEME_DIR" --include='*.php' --include='*.js' | grep -viE '(placeholder|example|sample|your[_-]?|xxxx|\.\.\.)'; then
+            echo "FAIL: possivel segredo hardcoded."
+            exit 1
+          fi
+          echo "OK: nenhum segredo hardcoded aparente."
+      - name: JS perigoso
+        run: |
+          DANGEROUS_JS='(\beval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(|document\.write[[:space:]]*\()'
+          if grep -rniE "$DANGEROUS_JS" "$THEME_DIR" --include='*.js'; then
+            echo "FAIL: padrao JS perigoso encontrado."
+            exit 1
+          fi
+          echo "OK: nenhum padrao JS perigoso."
+
+  theme-validate:
+    name: theme-validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Arquivos e cabecalhos obrigatorios do tema WordPress
+        run: |
+          cd "$THEME_DIR"
+          fail=0
+          test -f style.css   || { echo "FAIL: falta style.css";   fail=1; }
+          test -f index.php   || { echo "FAIL: falta index.php";   fail=1; }
+          grep -qiE '^[[:space:]]*Theme Name:'                style.css || { echo "FAIL: style.css sem 'Theme Name:'"; fail=1; }
+          grep -qiE '^[[:space:]]*Version:[[:space:]]*[0-9]+\.[0-9]+' style.css || { echo "FAIL: style.css sem 'Version:' semver"; fail=1; }
+          if [ "$fail" -eq 0 ]; then echo "OK: tema valido (style.css + index.php + cabecalhos)"; fi
+          exit $fail
