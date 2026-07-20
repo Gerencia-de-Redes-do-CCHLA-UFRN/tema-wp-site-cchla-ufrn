@@ -1,0 +1,261 @@
+/* ==========================================================
+   BASE TIPOGRÁFICA – PAGE INSTITUCIONAL (CCHLA)
+   ----------------------------------------------------------
+   Aplica o padrão de legibilidade ideal a todos os textos da
+   página, incluindo parágrafos, listas, blockquotes e figuras.
+   ========================================================== */
+
+.page-institucional {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #111827;
+  /* text-gray-900 */
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tipografia fluida */
+.page-institucional,
+.page-institucional p,
+.page-institucional li,
+.page-institucional blockquote,
+.page-institucional figcaption {
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  /* 16px → 20px */
+}
+
+/* Largura ideal de leitura */
+.page-institucional main {
+  max-width: 42rem;
+  /* ~672px para ~70 caracteres */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Parágrafos */
+.page-institucional p {
+  margin-bottom: 1.2rem;
+  color: #374151;
+  /* text-gray-700 */
+}
+
+/* Títulos */
+.page-institucional h1,
+.page-institucional h2,
+.page-institucional h3,
+.page-institucional h4,
+.page-institucional h5,
+.page-institucional h6 {
+  color: #111827;
+  line-height: 1.3;
+  font-weight: 700;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.page-institucional h1 {
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  color: #1d4ed8;
+  /* blue-700 */
+}
+
+.page-institucional h2 {
+  font-size: clamp(1.5rem, 2.2vw, 1.875rem);
+}
+
+.page-institucional h3 {
+  font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+}
+
+.page-institucional h4 {
+  font-size: clamp(1.125rem, 1.5vw, 1.25rem);
+}
+
+/* Listas */
+.page-institucional ul,
+.page-institucional ol {
+  padding: 0;
+}
+
+.page-institucional li {
+  color: #374151;
+  font-size: 1.2rem;
+}
+
+.page-institucional li a {
+  display: block;
+  padding: .25em 0;
+}
+
+/* Citações */
+.page-institucional blockquote {
+  position: relative;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  margin: 2.5rem auto;
+  padding: 2rem;
+  max-width: 42rem;
+  background-color: #fff;
+  font-weight: 500;
+  color: #111827;
+  text-align: justify;
+}
+
+.page-institucional blockquote::before,
+.page-institucional blockquote::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 120px;
+  height: 4px;
+  background-color: #3e72ff9c;
+  transform: translateX(-50%);
+}
+
+.page-institucional blockquote::before {
+  top: -3px;
+}
+
+.page-institucional blockquote::after {
+  bottom: -3px;
+}
+
+/* Imagens e figuras */
+.page-institucional img,
+.page-institucional figure {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1rem auto;
+  border-radius: 0.5rem;
+}
+
+.page-institucional figcaption {
+  text-align: left;
+  font-size: clamp(0.875rem, 1vw, 1rem);
+  color: #6b7280;
+  margin-left: 1rem;
+}
+
+/* Links */
+.page-institucional a {
+  color: #2563eb;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.page-institucional a:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* Responsividade refinada */
+@media (max-width: 768px) {
+  .page-institucional main {
+    max-width: 38rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .page-institucional blockquote::before,
+  .page-institucional blockquote::after {
+    width: 60px;
+  }
+}
+
+
+/* ==========================================================
+   ESTRUTURA ORGANIZACIONAL – CCHLA
+   ========================================================== */
+
+/* ----- Grid de setores ----- */
+.orgaos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: .25rem;
+  margin: 1rem auto;
+}
+
+/* ----- Bloco de setor ----- */
+.orgaos>hr,
+.orgaos>br,
+.orgaos>p {
+  display: none;
+}
+
+.orgaos>article,
+.orgaos .setor {
+  border-top: 1px solid #2563eb;
+  padding: 1rem 1rem 1.25rem;
+  background: #ffffff;
+}
+
+.orgaos>article h2,
+.orgaos>article h3,
+.setor h2,
+.setor h3 {
+  font-size: 1rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin: 1.25rem 0;
+  padding-bottom: .25rem;
+}
+
+.orgaos>article p,
+.setor p {
+  margin-bottom: 0.75rem;
+  font-size: 0.9375rem;
+  color: #374151;
+}
+
+.orgaos>article strong,
+.setor strong {
+  display: block;
+  font-weight: 600;
+  color: #111827;
+}
+
+.orgaos>article a,
+.setor a {
+  color: #2563eb;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.orgaos>article a:hover,
+.orgaos>article a:focus,
+.setor a:hover,
+.setor a:focus {
+  text-decoration: underline;
+  color: #1d4ed8;
+}
+
+/* ----- Mobile (colapso total) ----- */
+@media (max-width: 640px) {
+  .orgaos {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .orgaos>article,
+  .setor {
+    border-top: 1px solid #cbd5e1;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    padding: 1.25rem 0;
+  }
+
+  .orgaos>article h2,
+  .setor h2 {
+    border-bottom: none;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .orgaos>article p,
+  .setor p {
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+}
