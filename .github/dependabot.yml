@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Sem npm/composer: o tema e PHP+assets estaticos, sem gerenciador de dependencias.
+  # Mantem apenas as proprias GitHub Actions (checkout@v4, setup-php@v2, etc.) atualizadas.
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: "dev"          # NUNCA aponte direto pra main
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 3
+    labels: [dependencies, infra]
+    commit-message:
+      prefix: ci
+      include: scope
+    ignore:
+      # Majors ficam fora do automatico — exigem revisao manual de breaking changes.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

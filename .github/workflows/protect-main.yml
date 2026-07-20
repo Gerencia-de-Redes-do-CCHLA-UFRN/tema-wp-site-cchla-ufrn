@@ -1,0 +1,94 @@
+name: Protect Main
+
+# Rede de seguranca reativa. A trava principal e a branch protection NATIVA do
+# GitHub (repo publico) — que bloqueia o push direto antes de acontecer. Como a
+# nativa nao vale pra admins que optem por burlar, este workflow reverte + audita
+# qualquer push direto em main que nao tenha vindo de PR/merge.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify-origin:
+    name: Verifica se push veio de PR
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'   # evita loop com o proprio bot de revert
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Classificar push
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          # A associacao commit<->PR pode levar alguns segundos pra indexar apos o
+          # merge. Sem retry, um merge de PR legitimo era classificado como push
+          # direto e o revert (de um merge commit, sem -m) falhava.
+          PR_NUM=""
+          for attempt in 1 2 3 4 5; do
+            PR_NUM=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
+              --jq '.[] | select(.merged_at != null) | .number' 2>/dev/null | head -n1 || true)
+            [ -n "$PR_NUM" ] && break
+            echo "tentativa $attempt: PR ainda nao associado, aguardando..."
+            sleep 5
+          done
+
+          # Conta pais do commit: commit normal = 2 tokens (sha + 1 pai), merge
+          # commit = 3+ tokens. Merge commits sao sempre fruto de merge (nunca
+          # push direto de feature), entao nunca tentamos reverter.
+          PARENTS=$(git rev-list --parents -n1 "$SHA" | wc -w)
+
+          if [ -n "$PR_NUM" ]; then
+            echo "verdict=ok-pr-merge" >> "$GITHUB_OUTPUT"
+          elif [ "$PARENTS" -ge 3 ]; then
+            echo "verdict=ok-merge-commit" >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict=direct-push" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Revert push direto
+        if: steps.check.outputs.verdict == 'direct-push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git revert --no-edit "$SHA"; then
+            git push origin main
+            REVERT_SHA=$(git rev-parse HEAD)
+            cat > /tmp/issue-body.md <<EOF
+          Push direto em \`main\` detectado e revertido automaticamente.
+
+          **Autor**: @${ACTOR}
+          **SHA original**: \`${SHA}\`
+          **SHA do revert**: \`${REVERT_SHA}\`
+
+          Fluxo correto: branch pessoal -> PR para \`dev\` -> PR de \`dev\` para \`main\`.
+
+          Se era hotfix intencional: abrir PR a partir de \`hotfix/<nome>\` direto para \`main\`, com justificativa.
+          EOF
+          else
+            git revert --abort || true
+            cat > /tmp/issue-body.md <<EOF
+          Push direto em \`main\` por @${ACTOR} no SHA \`${SHA}\`, mas o revert automatico falhou (conflitos). Revert manual necessario.
+          EOF
+          fi
+
+          gh issue create \
+            --title "security: push direto em main por @${ACTOR}" \
+            --body-file /tmp/issue-body.md \
+            --label "security,priority:high,infra"
