@@ -47,11 +47,14 @@ jobs:
           coverage: none
       - name: Instalar PHP_CodeSniffer + WordPress Coding Standards
         run: |
+          # Composer 2.2+ bloqueia plugins de terceiros por padrao; libera o installer do PHPCS.
+          composer global config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
           composer global require --no-interaction \
             squizlabs/php_codesniffer \
             wp-coding-standards/wpcs \
             dealerdirect/phpcodesniffer-composer-installer:^1.0
           echo "$HOME/.composer/vendor/bin" >> "$GITHUB_PATH"
+          "$HOME/.composer/vendor/bin/phpcs" -i
       - name: Rodar phpcs (padrao WordPress) — informativo
         run: |
           phpcs --standard=WordPress --extensions=php --report=summary "$THEME_DIR" || true
